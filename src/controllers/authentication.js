@@ -36,6 +36,8 @@ export const login = async (req, res) => {
             return res.sendStatus(400);
         }
         const user = await getUserByEmail(email).select({
+            username: 1,
+            email: 1,
             authentication: {
                 salt: 1,
                 password: 1
