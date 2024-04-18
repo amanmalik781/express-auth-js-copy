@@ -1,5 +1,6 @@
+import JWT from 'jsonwebtoken';
 import { getUserByEmail, createUser } from '../db/users.js';
-import { random, authentication } from '../helpers/index.js'
+import { generateSalt, generateHashedPassword } from '../helpers/index.js'
 
 export const register = async (req, res) => {
     try {
@@ -11,15 +12,14 @@ export const register = async (req, res) => {
         if (existingUser) { // user already exists so cannot create again
             return res.sendStatus(400);
         }
-
         // if not then we go ahead and create one
-        const salt = random();
+        const salt = generateSalt();
         const user = await createUser({
             email,
             username,
             authentication: {
                 salt,
-                password: authentication(salt, password)
+                password: generateHashedPassword(salt, password)
             }
         });
         return res.status(200).json(user).end();
@@ -35,24 +35,42 @@ export const login = async (req, res) => {
         if (!email || !password) {
             return res.sendStatus(400);
         }
-        const user = await getUserByEmail(email).select('+authentication.salt +authentication.password');
+        const user = await getUserByEmail(email).select({
+            authentication: {
+                salt: 1,
+                password: 1
+            }
+        });
         if (!user) { // user doesn't exists then we cannot login
             return res.sendStatus(400);
         }
-        console.log(user);
-        const expectedHash = authentication(user.authentication.salt, password);
+        const expectedHash = generateHashedPassword(user.authentication.salt, password);
         if (user.authentication.password !== expectedHash) {
             return res.sendStatus(403);
         }
-
-        const salt = random();
-        user.authentication.sessionToken = authentication(salt, user._id.toString());
+        // payload to create JWT token
+        const payload = {
+            id: user._id,
+            username: user.username,
+            email: user.email
+        };
+        // JWT token
+        const token = JWT.sign(payload, process.env.SECRET);
+        user.authentication.sessionToken = token;
         await user.save();
-        res.cookie('AUTH', user.authentication.sessionToken, { domain: 'localhost', path: '/' });
-
+        res.cookie('token', user.authentication.sessionToken);
         return res.status(200).json(user).end();
     } catch (error) {
         console.log('login controller error', error);
         return res.sendStatus(400);
     }
 }
+
+export const logout = (req, res) => {
+    try {
+        return res.clearCookie("token").sendStatus(200);
+    } catch (e) {
+        console.log(e.message);
+    }
+
+};

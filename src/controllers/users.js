@@ -1,14 +1,5 @@
 import { getUsers, deleteUserById, getUserById } from '../db/users.js';
 // What is the diff b/w status and sendStatus?
-export const getAllUsers = async (req, res) => {
-    try {
-        const users = await getUsers();
-        return res.status(200).json(users).end();
-    } catch (e) {
-        console.log(e);
-        return res.sendStatus(400);
-    }
-}
 
 export const deleteUser = async (req, res) => {
     try {
